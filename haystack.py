@@ -91,6 +91,20 @@ def format(string, dictionary):
     return string
 
 
+def get_file(path):
+    """
+    Looks for a path. If path is not a file or can't be read for any
+    reason, returns an empty list. If path is '-', return
+    sys.stdin.readlines(). Otherwise, return list of lines in that file.
+    """
+    if path == '-':
+        return sys.stdin.readlines()
+    try:
+        return open(path, 'r').readlines()
+    except:
+        return []
+
+
 def search(input, first_pattern, second_pattern,
            output_format=output_format,
            instant=False, forwards=False, max_results=-1):
@@ -128,15 +142,9 @@ def search(input, first_pattern, second_pattern,
                defining the string formatting in 'output_format').
                If 'instant' is True, the list will be empty.
     """
-    if input not in ['-', ''] and not os.path.isfile(input):
-        raise OSError("Input file %s doesn't exist or isn't a file" % input)
 
     line = 0
-    if input in ['-', '']:
-        lines = sys.stdin.readlines()
-        input = 'stdin'
-    else:
-        lines = open(input, 'r').readlines()
+    lines = get_file(input)
     matches = []
     first_pattern_regex = type(first_pattern) == regex_type
     second_pattern_regex = type(second_pattern) == regex_type
