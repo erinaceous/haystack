@@ -9,7 +9,7 @@ Owain Jones [github.com/doomcat]
 
 import re
 
-p_cmd_line_regex = re.compile(r'/(.*)/(.*)$')
+p_cmd_line_regex = re.compile(r'/(.*)/((\w)\:?(\d+)?,?)*$')
 p_regex_regex = re.compile(r'\b(?<!\\)(?<!P\<)[0-9A-Za-z]{2,}\b')
 p_word_regex = re.compile(r'[0-9A-Za-z]+')
 
@@ -31,8 +31,8 @@ class FixedPattern(object):
             pattern = pattern.lower()
             string = string.lower()
         if self.flags & FixedPattern.WHOLE == FixedPattern.WHOLE:
-            return pattern == string
-        return pattern in string
+            return (pattern == string, None)
+        return (pattern in string, None)
 
     def has(self, flag):
         """Check if an instance has a certain flag set"""
@@ -74,7 +74,8 @@ class RegExPattern(FixedPattern):
         self._pattern = self._compile()
 
     def matches(self, string):
-        return self._pattern.match(string) is not None
+        match = self._pattern.match(string)
+        return (match is not None, match)
 
     def match(self, string):
         return self._pattern.match(string)
@@ -128,9 +129,6 @@ class FuzzyRegExPattern(RegExPattern):
         self._pattern = self._compile()
 
     def distance(self, string):
-        match = self.match(string)
-        if match is None:
-            return self.max_dist + 1
         d = 0
         for i, word in enumerate(p_word_regex.findall(string)):
             if i not in self.words.keys():
@@ -140,10 +138,13 @@ class FuzzyRegExPattern(RegExPattern):
         return d
 
     def matches(self, string):
-        return self.distance(string) <= self.max_dist
+        match = self.match(string)
+        return (((self.distance(string) <= self.max_dist) &
+                 (match is not None)),
+                match)
 
 
-def from_string(string):
+def from_string(string, flag=0):
     """Parses a string to find out what kind of pattern it is.
        Anything not beginning and ending with forward slash (/) is
        treated as a fixed string.
@@ -155,7 +156,7 @@ def from_string(string):
         return None
     result = re.match(p_cmd_line_regex, string)
     if result is None:
-        return FixedPattern(string)
+        return FixedPattern(string, flags=flag)
     flags = {
         "i": RegExPattern.CASEI,
         "m": RegExPattern.MULTI,
@@ -164,7 +165,8 @@ def from_string(string):
         "v": RegExPattern.VERBOSE,
         "w": FixedPattern.WHOLE
     }
-    f = 0
+    print result.groups()
+    f = flag
     for c in result.group(2):
         if c in flags.keys():
             f |= flags[c]
