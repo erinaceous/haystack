@@ -1,14 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # encoding: utf-8
 # vim: tabstop=4 shiftwidth=4 softtabstop=4 expandtab
 """
-$Id$
-
-Author     : owjo
-Created on : 02 May 13
-Last change: $Date$
-             by: $Author$
-
 Search for a fixed string or a regular expression in a text file.
 Whenever an instance is found, backtrack (or go forwards) to find what
 request/job/file/pass/whatever was affected (find a related line), using
@@ -31,10 +24,13 @@ characters in the regex, so if your pattern is '/color/ia' it will
 match lines like 'color', 'COLOUR', 'COLLOR', 'Colur' etc.
 (This works best with words like 'successfully')
 
-TODO: Improve 'approximate search'
-TODO: Rewrite it to also accept input from stdin.
+TODO: Improve 'approximate search'.
+TODO: Fix the stdin input.
+TODO: More streaming of files, less loading whole files at a time.
+
+Owain Jones [github.com/doomcat]
 """
-__version__ = "$Revision$"
+__version__ = "1.0"
 
 import os
 import re
@@ -53,7 +49,7 @@ except Exception:
     colored = c
 
 output_format = r"{file}:{first_line_num},{second_line_num}"
-output_format += r"{first_line} -> {second_line}"
+output_format += r" {first_line} -> {second_line}"
 regex_type = type(re.compile(''))
 format_regex = re.compile('\{(\w+)?(\:(\w+))?\}')
 
