@@ -26,11 +26,14 @@ class FixedPattern(object):
         self.flags = flags
 
     def matches(self, string):
+        """Returns a tuple containing a boolean (whether the string
+           matches the pattern or not) and a MatchObject. For
+           FixedPatterns the second element is None."""
         pattern = self.pattern
-        if self.flags & FixedPattern.CASEI == FixedPattern.CASEI:
+        if self.has(FixedPattern.CASEI):
             pattern = pattern.lower()
             string = string.lower()
-        if self.flags & FixedPattern.WHOLE == FixedPattern.WHOLE:
+        if self.has(FixedPattern.WHOLE):
             return (pattern == string, None)
         return (pattern in string, None)
 
@@ -52,16 +55,17 @@ class RegExPattern(FixedPattern):
     def _f2rf(cls, flags):
         """Convert our types of flags into re. flags"""
         rf = 0
-        if flags & RegExPattern.CASEI == RegExPattern.CASEI:
-            rf |= re.IGNORECASE
-        if flags & RegExPattern.MULTI == RegExPattern.MULTI:
-            rf |= re.MULTILINE
-        if flags & RegExPattern.DOTALL == RegExPattern.DOTALL:
-            rf |= re.DOTALL
-        if flags & RegExPattern.UNICODE == RegExPattern.UNICODE:
-            rf |= re.UNICODE
-        if flags & RegExPattern.VERBOSE == RegExPattern.VERBOSE:
-            rf |= re.VERBOSE
+        translations = {
+            1: re.IGNORECASE,
+            3: re.MULTI,
+            4: re.DOTALL,
+            5: re.UNICODE,
+            6: re.VERBOSE
+        }
+        for t in translations:
+            if flags & t == t:
+                rf |= translations[t]
+
         return rf
 
     def _compile(self):
@@ -74,6 +78,8 @@ class RegExPattern(FixedPattern):
         self._pattern = self._compile()
 
     def matches(self, string):
+        """Returns a tuple containing a boolean (whether the string
+           matches the pattern or not) and a MatchObject."""
         match = self._pattern.match(string)
         return (match is not None, match)
 
@@ -90,7 +96,7 @@ class RegExPattern(FixedPattern):
 class FuzzyRegExPattern(RegExPattern):
     """Stub class."""
 
-    DISTANCE = 3  # default levenshtein distance threshold
+    DEFAULT_DISTANCE = 3  # default levenshtein distance threshold
 
     @classmethod
     def levenshtein(cls, s1, s2):
@@ -115,7 +121,7 @@ class FuzzyRegExPattern(RegExPattern):
 
         return previous_row[-1]
 
-    def __init__(self, pattern, flags=0, max_dist=DISTANCE):
+    def __init__(self, pattern, flags=0, max_dist=DEFAULT_DISTANCE):
         super(RegExPattern, self).__init__(pattern, flags)
         self.max_dist = max_dist
         self.words = dict()
@@ -139,9 +145,8 @@ class FuzzyRegExPattern(RegExPattern):
 
     def matches(self, string):
         match = self.match(string)
-        return (((self.distance(string) <= self.max_dist) &
-                 (match is not None)),
-                match)
+        within_distance = (self.distance(string) <= self.max_dist)
+        return (within_distance & (match is not None), match)
 
 
 def from_string(string, flag=0):
@@ -158,7 +163,7 @@ def from_string(string, flag=0):
     if result is None:
         return FixedPattern(string, flags=flag)
     flags = {
-        "i": RegExPattern.CASEI,
+        "i": FixedPattern.CASEI,
         "m": RegExPattern.MULTI,
         "d": RegExPattern.DOTALL,
         "u": RegExPattern.UNICODE,
