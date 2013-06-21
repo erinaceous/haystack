@@ -9,7 +9,8 @@ Owain Jones [github.com/doomcat]
 
 import re
 
-p_cmd_line_regex = re.compile(r'/(.*)/((\w)\:?(\d+)?,?)*$')
+p_cmd_line_regex = re.compile(r'/(.*)/(.*)$')
+p_cmd_flag_regex = re.compile(r'(\w+(?:\:\w+)?),?')
 p_regex_regex = re.compile(r'\b(?<!\\)(?<!P\<)[0-9A-Za-z]{2,}\b')
 p_word_regex = re.compile(r'[0-9A-Za-z]+')
 
@@ -18,7 +19,7 @@ class FixedPattern(object):
     """Base pattern-matching class."""
 
     # Flags
-    CASEI = 1  # case-insensitive
+    ICASE = 1  # case-insensitive
     WHOLE = 2  # whole string has to match pattern
 
     def __init__(self, pattern, flags=0):
@@ -30,14 +31,14 @@ class FixedPattern(object):
            matches the pattern or not) and a MatchObject. For
            FixedPatterns the second element is None."""
         pattern = self.pattern
-        if self.has(FixedPattern.CASEI):
+        if self.has(FixedPattern.ICASE):
             pattern = pattern.lower()
             string = string.lower()
         if self.has(FixedPattern.WHOLE):
             return (pattern == string, None)
         return (pattern in string, None)
 
-    def has(self, flag):
+    def has_flag(self, flag):
         """Check if an instance has a certain flag set"""
         return self.flags & flag == flag
 
@@ -51,13 +52,13 @@ class RegExPattern(FixedPattern):
     UNICODE = 5
     VERBOSE = 6  # allow multi-line, whitespaced, commented regexes
 
-    @classmethod
-    def _f2rf(cls, flags):
+    @staticmethod
+    def _f2rf(flags):
         """Convert our types of flags into re. flags"""
         rf = 0
         translations = {
             1: re.IGNORECASE,
-            3: re.MULTI,
+            3: re.MULTILINE,
             4: re.DOTALL,
             5: re.UNICODE,
             6: re.VERBOSE
@@ -73,7 +74,7 @@ class RegExPattern(FixedPattern):
 
     def __init__(self, pattern, flags=0):
         super(RegExPattern, self).__init__(pattern, flags)
-        if self.has(FixedPattern.WHOLE):
+        if self.has_flag(FixedPattern.WHOLE):
             self.pattern = "^%s$" % self.pattern
         self._pattern = self._compile()
 
@@ -98,8 +99,8 @@ class FuzzyRegExPattern(RegExPattern):
 
     DEFAULT_DISTANCE = 3  # default levenshtein distance threshold
 
-    @classmethod
-    def levenshtein(cls, s1, s2):
+    @staticmethod
+    def levenshtein(s1, s2):
         """Calculates the Levenshtein Distance between two strings.
            Lifted in its entirety from Wikibooks' Levenshtein entry:
            http://bit.ly/bkXrER
@@ -128,19 +129,23 @@ class FuzzyRegExPattern(RegExPattern):
         for i, word in enumerate(p_regex_regex.findall(pattern)):
             pattern = pattern.replace(word, r'\w+')
             self.words[i] = word
-        if self.has(FixedPattern.WHOLE):
+        if self.has_flag(FixedPattern.WHOLE):
             pattern = "^%s$" % pattern
         self.pattern = pattern
-        print self.pattern
         self._pattern = self._compile()
 
     def distance(self, string):
         d = 0
         for i, word in enumerate(p_word_regex.findall(string)):
+            word1 = self.words[i]
+            word2 = word
+            if self.has_flag(FixedPattern.ICASE):
+                word1 = word1.lower()
+                word2 = word2.lower()
             if i not in self.words.keys():
-                d += len(word)
+                d += len(word2)
             else:
-                d += FuzzyRegExPattern.levenshtein(self.words[i], word)
+                d += FuzzyRegExPattern.levenshtein(word1, word2)
         return d
 
     def matches(self, string):
@@ -162,20 +167,25 @@ def from_string(string, flag=0):
     result = re.match(p_cmd_line_regex, string)
     if result is None:
         return FixedPattern(string, flags=flag)
+    flag_result = p_cmd_flag_regex.findall(result.group(2))
     flags = {
-        "i": FixedPattern.CASEI,
-        "m": RegExPattern.MULTI,
-        "d": RegExPattern.DOTALL,
-        "u": RegExPattern.UNICODE,
-        "v": RegExPattern.VERBOSE,
-        "w": FixedPattern.WHOLE
+        "i": FixedPattern.ICASE, "icase": FixedPattern.ICASE,
+        "m": RegExPattern.MULTI, "multi": RegExPattern.MULTI,
+        "d": RegExPattern.DOTALL, "dotall": RegExPattern.DOTALL,
+        "u": RegExPattern.UNICODE, "unicode": RegExPattern.UNICODE,
+        "v": RegExPattern.VERBOSE, "verbose": RegExPattern.VERBOSE,
+        "w": FixedPattern.WHOLE, "whole": FixedPattern.WHOLE
     }
-    print result.groups()
     f = flag
-    for c in result.group(2):
+    for c in flag_result:
         if c in flags.keys():
             f |= flags[c]
     regex = result.group(1)
-    if 'a' in result.group(2):
-        return FuzzyRegExPattern(regex, flags=f)
+    for r in flag_result:
+        if r.startswith('a') or r.startswith('approx'):
+            try:
+                dist = int(r.split(':')[1])
+            except IndexError:
+                dist = FuzzyRegExPattern.DEFAULT_DISTANCE
+            return FuzzyRegExPattern(regex, flags=f, max_dist=dist)
     return RegExPattern(regex, flags=f)

@@ -22,11 +22,13 @@ expressions) by using the 'a' flag at the end of your regex, 'a'
 standing for 'approximate'. This expands some literal alphabet
 characters in the regex, so if your pattern is '/color/ia' it will
 match lines like 'color', 'COLOUR', 'COLLOR', 'Colur' etc.
-(This works best with words like 'successfully')
+(This works nicely with awkward words like 'successfully')
 
 TODO: Improve 'approximate search'.
-TODO: Fix the stdin input.
-TODO: More streaming of files, less loading whole files at a time.
+TODO: Fix the stdin input: Right now it hangs when it should be reading
+      from stdin?
+TODO: More streaming of files, less loading whole files at a time. Use
+      the readline module!
 
 Owain Jones [github.com/doomcat]
 """
@@ -40,10 +42,10 @@ import argparse
 try:
     from termcolor import colored
     colored = colored
+#except ImportError:
+#    from xtermcolor import colorize
+#    colored = colorize
 except ImportError:
-    from xtermcolor import colorize
-    colored = colorize
-except Exception:
     def c(string, color):
         return string
     colored = c
