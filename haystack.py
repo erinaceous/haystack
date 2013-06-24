@@ -24,11 +24,14 @@ characters in the regex, so if your pattern is '/color/ia' it will
 match lines like 'color', 'COLOUR', 'COLLOR', 'Colur' etc.
 (This works nicely with awkward words like 'successfully')
 
-TODO: Improve 'approximate search'.
+TODO: Improve 'approximate search': incorporate patterns.py
 TODO: Fix the stdin input: Right now it hangs when it should be reading
       from stdin?
 TODO: More streaming of files, less loading whole files at a time. Use
       the readline module!
+TODO: Multiple patterns (1-9). Each can have multiple options:
+      $ haytack -1 "first pattern" "alt. first pattern" \\
+        -2 "middle" -3 "top" "alt. top"
 
 Owain Jones [github.com/doomcat]
 """
@@ -42,9 +45,9 @@ import argparse
 try:
     from termcolor import colored
     colored = colored
-#except ImportError:
-#    from xtermcolor import colorize
-#    colored = colorize
+except ImportError:
+    from xtermcolor import colorize
+    colored = colorize
 except ImportError:
     def c(string, color):
         return string
@@ -103,9 +106,8 @@ def get_file(path):
         return []
 
 
-def search(input, first_pattern, second_pattern,
-           output_format=output_format,
-           instant=False, forwards=False, max_results=-1):
+def search(input, first_pattern, second_pattern, output_format=output_format,
+           instant=False, forwards=False, max_results=-1, context=True):
     """
     Searches for instances of 'first_pattern' -- if a line contains that
     fixed string or regular expression, then backtrack back up the file
@@ -135,6 +137,9 @@ def search(input, first_pattern, second_pattern,
                than backtracking back up the file.
     max_results:  Maximum number of results to return. Function will
                   stop searching as soon as this number is reached.
+    context:    If True, add all lines between the first and second
+                match as a variable '{context}' that can be used in the
+                output format string
 
     Returns:   A list of matches (in whatever format you give it by
                defining the string formatting in 'output_format').
@@ -155,6 +160,11 @@ def search(input, first_pattern, second_pattern,
         else:
             line -= 1
         while line >= 0 and line < len(lines):
+            if forwards is True:
+                groups['context'] += "\n" + lines[line]
+            else:
+                groups['context'] = lines[line] + "\n" + groups['context']
+
             groups['second_line'] = lines[line]
             groups['second_line_num'] = line
             if second_pattern_regex:
@@ -166,7 +176,7 @@ def search(input, first_pattern, second_pattern,
                     groups.update(second_pattern_groups)
                     match = format(output_format, groups)
                     if instant:
-                        print match
+                        print match,
                     else:
                         matches.append(match)
                     groups['results'] += 1
@@ -174,7 +184,7 @@ def search(input, first_pattern, second_pattern,
             elif second_pattern in lines[line]:
                 match = format(output_format, groups)
                 if instant:
-                    print match
+                    print match,
                 else:
                     matches.append(match)
                 return
@@ -185,11 +195,12 @@ def search(input, first_pattern, second_pattern,
 
     def _found_result(line):
         if second_pattern is not None:
+            groups['context'] = lines[line]
             _backtrack(line)
         else:
             match = format(output_format, groups)
             if instant:
-                print match
+                print match,
             else:
                 matches.append(match)
             groups['results'] += 1
@@ -276,6 +287,9 @@ def main(files, first, second, output_format=output_format,
     first_pattern = l['first']
     second_pattern = l['second']
 
+    # Make sure newlines and tabs are formatted properly
+    output_format = output_format.replace('\\t', '\t').replace('\\n', '\n')
+
     # Loop over all the files
     if files == []:
         files.append('-')
@@ -286,7 +300,7 @@ def main(files, first, second, output_format=output_format,
                          output_format, instant, forwards,
                          max_results)
         if instant is False and len(matches) > 0:
-            print '\n'.join(matches)
+            print ''.join(matches)
 
 
 def _run():
