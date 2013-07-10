@@ -37,10 +37,13 @@ Owain Jones [github.com/doomcat]
 """
 __version__ = "1.0"
 
+import gc
 import os
 import re
 import sys
 import argparse
+
+gc.disable()  # lol lol lol lol
 
 try:
     from termcolor import colored
